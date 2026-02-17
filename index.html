@@ -78,6 +78,27 @@
         grid-template-columns: 1fr auto;
         gap: 8px;
       }
+      .share {
+        margin-top: 10px;
+      }
+      .share textarea {
+        width: 100%;
+        min-height: 72px;
+        resize: vertical;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.04);
+        color: #eaf0ff;
+        border-radius: 8px;
+        padding: 8px;
+        font-size: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      .share-actions {
+        margin-top: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
 
       .actions {
         display: flex;
@@ -223,10 +244,21 @@
         <button id="download-glsl" type="button">Download GLSL</button>
         <button id="copy-json" type="button">Copy JSON Preset</button>
         <button id="export-pack" type="button">Export Repro Pack</button>
+        <button id="import-pack" type="button">Import Repro Pack</button>
+        <button id="copy-link" type="button">Copy Share Link</button>
         <button id="randomize" type="button">Randomize</button>
         <button id="undo" type="button" disabled>Undo</button>
         <button id="reset" type="button">Reset</button>
       </div>
+      <div class="share">
+        <div class="section-title" style="margin-top:10px;">Quick Import</div>
+        <textarea id="import-text" placeholder="Paste preset JSON, share link, or share code here"></textarea>
+        <div class="share-actions">
+          <button id="import-text-btn" type="button">Import Pasted Data</button>
+          <button id="copy-code" type="button">Copy Share Code</button>
+        </div>
+      </div>
+      <input id="import-file" type="file" accept=".zip,.json,.txt,application/zip,application/json,text/plain" style="display:none;" />
       <div class="status" id="status"></div>
     </aside>
 
@@ -470,6 +502,8 @@
       const colorIds = ['c1', 'c2', 'c3', 'bg', 'accent'];
       const status = document.getElementById('status');
       const undoButton = document.getElementById('undo');
+      const importFileInput = document.getElementById('import-file');
+      const importTextEl = document.getElementById('import-text');
 
       function normalizeHex(input) {
         const trimmed = input.trim();
@@ -516,6 +550,22 @@
         if (!Number.isFinite(step) || step <= 0) return Math.min(max, Math.max(min, value));
         const n = Math.round((value - min) / step);
         return Math.min(max, Math.max(min, min + n * step));
+      }
+
+      function encodeBase64Url(text) {
+        const bytes = new TextEncoder().encode(text);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+      }
+
+      function decodeBase64Url(code) {
+        const normalized = code.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = normalized + '==='.slice((normalized.length + 3) % 4);
+        const binary = atob(padded);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new TextDecoder().decode(bytes);
       }
 
       function cloneState() {
@@ -696,9 +746,11 @@ Files:
 - embed-snippet.js: drop-in init snippet (uses shader-web-background.min.js)
 
 How to recreate:
-1) Serve shader-web-background.min.js in your site assets.
-2) Add shader.glsl as fragment shader script with id "Image" OR run embed-snippet.js.
-3) Keep content layered above shader canvas (z-index hints in integration.json).
+1) Open this Shader Lab and click "Import Repro Pack" to load preset.json from the ZIP.
+2) Or paste a share link/share code into "Quick Import" and click "Import Pasted Data".
+3) For website integration: serve shader-web-background.min.js in your site assets.
+4) Add shader.glsl as fragment shader script with id "Image" OR run embed-snippet.js.
+5) Keep content layered above shader canvas (z-index hints in integration.json).
 `;
       }
 
@@ -809,6 +861,125 @@ How to recreate:
 
         const zipBytes = concatUint8([...localChunks, centralData, end]);
         return new Blob([zipBytes], { type: 'application/zip' });
+      }
+
+      function parseZipTextFiles(arrayBuffer) {
+        const view = new DataView(arrayBuffer);
+        const bytes = new Uint8Array(arrayBuffer);
+        const decoder = new TextDecoder();
+        const files = {};
+        let offset = 0;
+
+        while (offset + 4 <= bytes.length) {
+          const sig = view.getUint32(offset, true);
+          if (sig === 0x04034b50) {
+            if (offset + 30 > bytes.length) throw new Error('Invalid ZIP header');
+            const compression = view.getUint16(offset + 8, true);
+            const compressedSize = view.getUint32(offset + 18, true);
+            const nameLen = view.getUint16(offset + 26, true);
+            const extraLen = view.getUint16(offset + 28, true);
+            const nameStart = offset + 30;
+            const nameEnd = nameStart + nameLen;
+            const dataStart = nameEnd + extraLen;
+            const dataEnd = dataStart + compressedSize;
+            if (dataEnd > bytes.length) throw new Error('Corrupt ZIP data');
+            const name = decoder.decode(bytes.slice(nameStart, nameEnd));
+            if (compression !== 0) throw new Error(`Unsupported ZIP compression for ${name}`);
+            files[name] = decoder.decode(bytes.slice(dataStart, dataEnd));
+            offset = dataEnd;
+            continue;
+          }
+          if (sig === 0x02014b50 || sig === 0x06054b50) break;
+          break;
+        }
+        return files;
+      }
+
+      function normalizeImportedState(raw) {
+        if (!raw || typeof raw !== 'object') throw new Error('Imported data is not a preset object');
+        const normalized = { ...defaults };
+
+        sliderIds.forEach((id) => {
+          if (raw[id] === undefined || raw[id] === null || raw[id] === '') return;
+          const el = document.getElementById(id);
+          const min = parseFloat(el.min);
+          const max = parseFloat(el.max);
+          const step = parseFloat(el.step);
+          const parsed = Number(raw[id]);
+          if (!Number.isFinite(parsed)) return;
+          normalized[id] = quantizeToStep(parsed, min, max, step);
+        });
+
+        colorIds.forEach((id) => {
+          const maybe = raw[id];
+          if (typeof maybe !== 'string') return;
+          const hex = normalizeHex(maybe);
+          if (hex) normalized[id] = hex;
+        });
+
+        return normalized;
+      }
+
+      function extractImportState(parsed) {
+        if (!parsed || typeof parsed !== 'object') throw new Error('No preset data found');
+        if (parsed.state && typeof parsed.state === 'object') return parsed.state;
+        return parsed;
+      }
+
+      function parseImportedText(text) {
+        const trimmed = text.trim();
+        if (!trimmed) throw new Error('Nothing to import');
+
+        if (trimmed.startsWith('{')) return JSON.parse(trimmed);
+
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          const url = new URL(trimmed);
+          const code = url.searchParams.get('preset');
+          if (!code) throw new Error('Share link is missing preset data');
+          return JSON.parse(decodeBase64Url(code));
+        }
+
+        return JSON.parse(decodeBase64Url(trimmed));
+      }
+
+      function applyImportedPreset(parsed, sourceLabel) {
+        const rawState = extractImportState(parsed);
+        const next = normalizeImportedState(rawState);
+        pushUndoSnapshot(cloneState());
+        Object.assign(state, next);
+        syncUI();
+        setStatus(`Imported ${sourceLabel}`);
+      }
+
+      function createSharePayload() {
+        return JSON.stringify({
+          exportVersion: EXPORT_VERSION,
+          state: { ...state },
+        });
+      }
+
+      function createShareCode() {
+        return encodeBase64Url(createSharePayload());
+      }
+
+      function createShareLink() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('preset', createShareCode());
+        return url.toString();
+      }
+
+      function tryImportFromQuery() {
+        const params = new URL(window.location.href).searchParams;
+        const code = params.get('preset');
+        if (!code) return;
+        try {
+          const parsed = JSON.parse(decodeBase64Url(code));
+          const next = normalizeImportedState(extractImportState(parsed));
+          Object.assign(state, next);
+          setStatus('Loaded preset from link');
+        } catch {
+          setStatus('Preset link could not be read');
+        }
       }
 
       function syncUI() {
@@ -1138,6 +1309,61 @@ void main() {
         }
       });
 
+      document.getElementById('copy-link').addEventListener('click', async () => {
+        try {
+          await copyText(createShareLink(), 'Share link copied');
+        } catch {
+          setStatus('Clipboard blocked');
+        }
+      });
+
+      document.getElementById('copy-code').addEventListener('click', async () => {
+        try {
+          await copyText(createShareCode(), 'Share code copied');
+        } catch {
+          setStatus('Clipboard blocked');
+        }
+      });
+
+      document.getElementById('import-text-btn').addEventListener('click', () => {
+        const raw = importTextEl.value;
+        try {
+          const parsed = parseImportedText(raw);
+          applyImportedPreset(parsed, 'pasted data');
+        } catch {
+          setStatus('Import failed: use preset JSON, share link, or share code');
+        }
+      });
+
+      document.getElementById('import-pack').addEventListener('click', () => {
+        importFileInput.click();
+      });
+
+      importFileInput.addEventListener('change', async () => {
+        const file = importFileInput.files && importFileInput.files[0];
+        if (!file) return;
+        try {
+          const name = file.name.toLowerCase();
+          if (name.endsWith('.zip')) {
+            const files = parseZipTextFiles(await file.arrayBuffer());
+            const presetText =
+              files['preset.json'] ||
+              files['./preset.json'] ||
+              Object.entries(files).find(([fname]) => fname.toLowerCase().endsWith('.json'))?.[1];
+            if (!presetText) throw new Error('No preset JSON in ZIP');
+            const parsed = JSON.parse(presetText);
+            applyImportedPreset(parsed, file.name);
+          } else {
+            const parsed = parseImportedText(await file.text());
+            applyImportedPreset(parsed, file.name);
+          }
+        } catch {
+          setStatus('Import failed: unsupported or corrupted file');
+        } finally {
+          importFileInput.value = '';
+        }
+      });
+
       document.getElementById('export-pack').addEventListener('click', () => {
         try {
           const glsl = buildExportShader();
@@ -1166,6 +1392,7 @@ void main() {
         }
       });
 
+      tryImportFromQuery();
       syncUI();
       updateUndoButton();
 
