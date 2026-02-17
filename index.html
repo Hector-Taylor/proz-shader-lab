@@ -96,6 +96,10 @@
         text-decoration: none;
       }
       button:hover, a.btn:hover { border-color: rgba(255, 255, 255, 0.45); }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
       .status { margin-top: 8px; font-size: 11px; color: #9fb2da; min-height: 16px; }
     </style>
   </head>
@@ -219,6 +223,8 @@
         <button id="download-glsl" type="button">Download GLSL</button>
         <button id="copy-json" type="button">Copy JSON Preset</button>
         <button id="export-pack" type="button">Export Repro Pack</button>
+        <button id="randomize" type="button">Randomize</button>
+        <button id="undo" type="button" disabled>Undo</button>
         <button id="reset" type="button">Reset</button>
       </div>
       <div class="status" id="status"></div>
@@ -453,6 +459,9 @@
 
       const state = { ...defaults };
       const EXPORT_VERSION = 'repro-pack-v1';
+      const UNDO_LIMIT = 120;
+      const undoStack = [];
+      const undoSnapshots = new Map();
       const sliderIds = [
         'points','force','rotation','swirlFreq','speed','zoom','drift','strength','ambient','offset','radius',
         'normalScale','specLow','specHigh','cycleSpeed','cycleAmount','gain','gamma','accentMix',
@@ -460,6 +469,7 @@
       ];
       const colorIds = ['c1', 'c2', 'c3', 'bg', 'accent'];
       const status = document.getElementById('status');
+      const undoButton = document.getElementById('undo');
 
       function normalizeHex(input) {
         const trimmed = input.trim();
@@ -475,6 +485,132 @@
         const h = hex.replace('#', '');
         const v = parseInt(h, 16);
         return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
+      }
+
+      function hslToHex(h, s, l) {
+        const hh = ((h % 360) + 360) % 360;
+        const ss = Math.max(0, Math.min(1, s));
+        const ll = Math.max(0, Math.min(1, l));
+        const c = (1 - Math.abs(2 * ll - 1)) * ss;
+        const x = c * (1 - Math.abs((hh / 60) % 2 - 1));
+        const m = ll - c / 2;
+        let r = 0; let g = 0; let b = 0;
+        if (hh < 60) [r, g, b] = [c, x, 0];
+        else if (hh < 120) [r, g, b] = [x, c, 0];
+        else if (hh < 180) [r, g, b] = [0, c, x];
+        else if (hh < 240) [r, g, b] = [0, x, c];
+        else if (hh < 300) [r, g, b] = [x, 0, c];
+        else [r, g, b] = [c, 0, x];
+        const toHex = (v) => {
+          const n = Math.round((v + m) * 255);
+          return Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
+        };
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+      }
+
+      function rand(min, max) {
+        return min + Math.random() * (max - min);
+      }
+
+      function quantizeToStep(value, min, max, step) {
+        if (!Number.isFinite(step) || step <= 0) return Math.min(max, Math.max(min, value));
+        const n = Math.round((value - min) / step);
+        return Math.min(max, Math.max(min, min + n * step));
+      }
+
+      function cloneState() {
+        return { ...state };
+      }
+
+      function statesEqual(a, b) {
+        const keys = Object.keys(defaults);
+        for (const key of keys) {
+          if (a[key] !== b[key]) return false;
+        }
+        return true;
+      }
+
+      function updateUndoButton() {
+        undoButton.disabled = undoStack.length === 0;
+      }
+
+      function pushUndoSnapshot(snapshot) {
+        if (!snapshot) return;
+        const current = cloneState();
+        if (statesEqual(snapshot, current)) return;
+        const last = undoStack[undoStack.length - 1];
+        if (last && statesEqual(last, snapshot)) return;
+        undoStack.push(snapshot);
+        if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+        updateUndoButton();
+      }
+
+      function beginUndoCapture(key) {
+        if (!undoSnapshots.has(key)) undoSnapshots.set(key, cloneState());
+      }
+
+      function commitUndoCapture(key) {
+        const snapshot = undoSnapshots.get(key);
+        if (snapshot) pushUndoSnapshot(snapshot);
+        undoSnapshots.delete(key);
+      }
+
+      function randomizePalette() {
+        const base = rand(0, 360);
+        const shiftA = rand(65, 135);
+        const shiftB = rand(190, 250);
+        state.c1 = hslToHex(base, rand(0.75, 0.98), rand(0.42, 0.62));
+        state.c2 = hslToHex(base + shiftA, rand(0.7, 0.96), rand(0.4, 0.64));
+        state.c3 = hslToHex(base + shiftB, rand(0.7, 0.96), rand(0.42, 0.66));
+        state.bg = hslToHex(base + rand(-22, 22), rand(0.2, 0.6), rand(0.03, 0.16));
+        state.accent = hslToHex(base + rand(135, 300), rand(0.72, 1.0), rand(0.54, 0.74));
+      }
+
+      function randomizeState() {
+        const preferredRanges = {
+          points: [3, 14],
+          force: [0.7, 5.0],
+          rotation: [1.0, 10.0],
+          swirlFreq: [4.0, 19.0],
+          speed: [0.35, 2.8],
+          zoom: [0.7, 1.45],
+          drift: [0.0, 0.04],
+          strength: [0.3, 1.25],
+          ambient: [0.15, 0.85],
+          offset: [0.75, 2.5],
+          radius: [0.55, 1.7],
+          normalScale: [0.004, 0.03],
+          specLow: [0.7, 0.92],
+          specHigh: [0.9, 1.15],
+          cycleSpeed: [0.0, 2.6],
+          cycleAmount: [0.0, 1.0],
+          gain: [0.8, 1.9],
+          gamma: [0.7, 1.5],
+          accentMix: [0.0, 0.62],
+          hueShift: [-0.3, 0.3],
+          huePulse: [0.0, 0.95],
+          saturation: [0.7, 2.1],
+          contrast: [0.8, 2.1],
+          brightness: [-0.16, 0.2],
+          posterize: [4, 32],
+          posterizeMix: [0.0, 0.72],
+          grain: [0.0, 0.13],
+          vignette: [0.0, 0.6],
+        };
+
+        sliderIds.forEach((id) => {
+          const el = document.getElementById(id);
+          const min = parseFloat(el.min);
+          const max = parseFloat(el.max);
+          const step = parseFloat(el.step);
+          const range = preferredRanges[id] || [min, max];
+          const lo = Math.max(min, range[0]);
+          const hi = Math.min(max, range[1]);
+          const value = quantizeToStep(rand(lo, hi), min, max, step);
+          state[id] = value;
+        });
+
+        randomizePalette();
       }
 
       function setStatus(msg) {
@@ -693,22 +829,32 @@ How to recreate:
 
       sliderIds.forEach((id) => {
         const el = document.getElementById(id);
+        el.addEventListener('focus', () => beginUndoCapture(`slider-${id}`));
+        el.addEventListener('pointerdown', () => beginUndoCapture(`slider-${id}`));
+        el.addEventListener('touchstart', () => beginUndoCapture(`slider-${id}`), { passive: true });
         el.addEventListener('input', () => {
           state[id] = parseFloat(el.value);
           const out = document.getElementById(`${id}-v`);
           if (out) out.textContent = Number(state[id]).toFixed(3).replace(/\.000$/, '');
         });
+        el.addEventListener('change', () => commitUndoCapture(`slider-${id}`));
+        el.addEventListener('blur', () => commitUndoCapture(`slider-${id}`));
       });
 
       colorIds.forEach((id) => {
         const picker = document.getElementById(id);
         const hexEl = document.getElementById(`${id}hex`);
 
+        picker.addEventListener('focus', () => beginUndoCapture(`color-${id}`));
         picker.addEventListener('input', () => {
           state[id] = picker.value;
           hexEl.value = picker.value;
           hexEl.classList.remove('invalid');
         });
+        picker.addEventListener('change', () => commitUndoCapture(`color-${id}`));
+        picker.addEventListener('blur', () => commitUndoCapture(`color-${id}`));
+
+        hexEl.addEventListener('focus', () => beginUndoCapture(`hex-${id}`));
 
         hexEl.addEventListener('input', () => {
           const hx = normalizeHex(hexEl.value);
@@ -721,6 +867,7 @@ How to recreate:
           picker.value = hx;
           hexEl.value = hx;
         });
+        hexEl.addEventListener('blur', () => commitUndoCapture(`hex-${id}`));
       });
 
       document.getElementById('apply-palette').addEventListener('click', () => {
@@ -733,6 +880,7 @@ How to recreate:
           setStatus('Paste at least 3 hex colors');
           return;
         }
+        pushUndoSnapshot(cloneState());
         const mapped = [
           found[0] || state.c1,
           found[1] || state.c2,
@@ -746,9 +894,29 @@ How to recreate:
       });
 
       document.getElementById('reset').addEventListener('click', () => {
+        pushUndoSnapshot(cloneState());
         Object.assign(state, defaults);
         syncUI();
         setStatus('Reset to defaults');
+      });
+
+      document.getElementById('randomize').addEventListener('click', () => {
+        pushUndoSnapshot(cloneState());
+        randomizeState();
+        syncUI();
+        setStatus('Randomized');
+      });
+
+      document.getElementById('undo').addEventListener('click', () => {
+        if (!undoStack.length) {
+          setStatus('Nothing to undo');
+          return;
+        }
+        const previous = undoStack.pop();
+        Object.assign(state, previous);
+        syncUI();
+        updateUndoButton();
+        setStatus('Undid last change');
       });
 
       function buildExportShader() {
@@ -999,6 +1167,7 @@ void main() {
       });
 
       syncUI();
+      updateUndoButton();
 
       shaderWebBackground.shade({
         shaders: {
