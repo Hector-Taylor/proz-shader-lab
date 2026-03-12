@@ -230,12 +230,12 @@
         <div class="color-item"><label for="c1">Color 1</label><input id="c1" type="color" value="#ff0000" /><input id="c1hex" class="hex" type="text" value="#ff0000" /></div>
         <div class="color-item"><label for="c2">Color 2</label><input id="c2" type="color" value="#00ff00" /><input id="c2hex" class="hex" type="text" value="#00ff00" /></div>
         <div class="color-item"><label for="c3">Color 3</label><input id="c3" type="color" value="#0000ff" /><input id="c3hex" class="hex" type="text" value="#0000ff" /></div>
-        <div class="color-item"><label for="bg">Base Tint</label><input id="bg" type="color" value="#000000" /><input id="bghex" class="hex" type="text" value="#000000" /></div>
+        <div class="color-item"><label for="bg">Base Tint</label><input id="bg" type="color" value="#ffffff" /><input id="bghex" class="hex" type="text" value="#ffffff" /></div>
         <div class="color-item"><label for="accent">Accent</label><input id="accent" type="color" value="#ff49a8" /><input id="accenthex" class="hex" type="text" value="#ff49a8" /></div>
       </div>
 
       <div class="palette-row" style="margin-top:8px;">
-        <input id="palette" class="hex" type="text" placeholder="#ff0000, #00ff00, #0000ff, #000000, #ff49a8" />
+        <input id="palette" class="hex" type="text" placeholder="#ff0000, #00ff00, #0000ff, #ffffff, #ff49a8" />
         <button id="apply-palette" type="button">Apply</button>
       </div>
 
@@ -371,6 +371,17 @@
 
       vec3 applyFx(vec3 col, vec2 uv)
       {
+          float neutral =
+              abs(uHueShift) +
+              abs(uHuePulse) +
+              abs(uSaturation - 1.0) +
+              abs(uContrast - 1.0) +
+              abs(uBrightness) +
+              abs(uPosterizeMix) +
+              abs(uGrain) +
+              abs(uVignette);
+          if (neutral < 0.0001) return col;
+
           vec3 hsv = rgb2hsv(max(col, vec3(0.0)));
           hsv.x = fract(hsv.x + uHueShift + sin(iTime * (0.35 + uHuePulse * 4.0)) * (uHuePulse * 0.25));
           hsv.y = clamp(hsv.y * uSaturation, 0.0, 1.0);
@@ -485,7 +496,7 @@
         c1: '#ff0000',
         c2: '#00ff00',
         c3: '#0000ff',
-        bg: '#000000',
+        bg: '#ffffff',
         accent: '#ff49a8',
       };
 
@@ -1203,6 +1214,17 @@ vec3 hsv2rgb(vec3 c)
 
 vec3 applyFx(vec3 col, vec2 uv)
 {
+    float neutral =
+        abs(HUE_SHIFT) +
+        abs(HUE_PULSE) +
+        abs(SATURATION - 1.0) +
+        abs(CONTRAST - 1.0) +
+        abs(BRIGHTNESS) +
+        abs(POSTERIZE_MIX) +
+        abs(GRAIN) +
+        abs(VIGNETTE);
+    if (neutral < 0.0001) return col;
+
     vec3 hsv = rgb2hsv(max(col, vec3(0.0)));
     hsv.x = fract(hsv.x + HUE_SHIFT + sin(iTime * (0.35 + HUE_PULSE * 4.0)) * (HUE_PULSE * 0.25));
     hsv.y = clamp(hsv.y * SATURATION, 0.0, 1.0);
