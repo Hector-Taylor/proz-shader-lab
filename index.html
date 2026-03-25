@@ -99,6 +99,60 @@
         flex-wrap: wrap;
         gap: 8px;
       }
+      .mode-switch {
+        display: flex;
+        gap: 8px;
+        margin: 0 0 14px;
+      }
+      .mode-chip {
+        flex: 1 1 0;
+        text-align: center;
+      }
+      .mode-chip.active {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 73, 168, 0.16));
+        border-color: rgba(255, 255, 255, 0.42);
+      }
+      .promo-section {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .promo-section.hidden {
+        display: none;
+      }
+      .promo-copy {
+        display: grid;
+        gap: 8px;
+      }
+      .promo-label {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #96a4c2;
+      }
+      .promo-copy textarea {
+        width: 100%;
+        min-height: 72px;
+        resize: vertical;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.04);
+        color: #eaf0ff;
+        border-radius: 8px;
+        padding: 8px;
+        font-size: 12px;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+      }
+      .promo-upload {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .upload-meta {
+        font-size: 11px;
+        color: #9fb2da;
+      }
 
       .actions {
         display: flex;
@@ -128,6 +182,10 @@
     <aside class="panel">
       <h1 class="title">Shader Lab</h1>
       <p class="sub">Tune live, paste hex palettes, then export baked GLSL or JSON preset.</p>
+      <div class="mode-switch" id="mode-switch">
+        <button class="mode-chip active" type="button" data-mode="shader">Shader</button>
+        <button class="mode-chip" type="button" data-mode="promo">Promo</button>
+      </div>
 
       <div class="section-title">Flow</div>
       <div class="grid">
@@ -239,6 +297,52 @@
         <button id="apply-palette" type="button">Apply</button>
       </div>
 
+      <section id="promo-controls" class="promo-section hidden">
+        <div class="section-title" style="margin-top:0;">Promo Composition</div>
+        <div class="promo-copy">
+          <label class="promo-label" for="promoBadge">Badge</label>
+          <input id="promoBadge" class="hex" type="text" value="PROZ LAB" />
+
+          <label class="promo-label" for="promoHeadline">Headline</label>
+          <textarea id="promoHeadline">The next shader drop condenses out of the noise.</textarea>
+
+          <label class="promo-label" for="promoBody">Body</label>
+          <textarea id="promoBody">Square social card, branded image, and type locked inside the same fluid field.</textarea>
+
+          <label class="promo-label" for="promoCta">CTA</label>
+          <input id="promoCta" class="hex" type="text" value="See the reveal" />
+        </div>
+
+        <div class="promo-upload">
+          <button id="upload-promo-image" type="button">Upload Promo Image</button>
+          <button id="clear-promo-image" type="button">Clear Image</button>
+          <span id="promo-image-meta" class="upload-meta">No image loaded</span>
+        </div>
+
+        <div class="grid" style="margin-top:12px;">
+          <div class="row"><label for="promoReveal">Reveal</label><span class="v" id="promoReveal-v"></span></div>
+          <input id="promoReveal" type="range" min="0" max="1" step="0.01" value="0.62" />
+
+          <div class="row"><label for="promoWarp">Warp</label><span class="v" id="promoWarp-v"></span></div>
+          <input id="promoWarp" type="range" min="0" max="1" step="0.01" value="0.34" />
+
+          <div class="row"><label for="promoFeather">Reveal Feather</label><span class="v" id="promoFeather-v"></span></div>
+          <input id="promoFeather" type="range" min="0.02" max="0.4" step="0.01" value="0.16" />
+
+          <div class="row"><label for="promoScale">Card Scale</label><span class="v" id="promoScale-v"></span></div>
+          <input id="promoScale" type="range" min="0.18" max="0.7" step="0.01" value="0.38" />
+
+          <div class="row"><label for="promoGlow">Glow</label><span class="v" id="promoGlow-v"></span></div>
+          <input id="promoGlow" type="range" min="0" max="1" step="0.01" value="0.46" />
+
+          <div class="row"><label for="promoX">Card X</label><span class="v" id="promoX-v"></span></div>
+          <input id="promoX" type="range" min="0.15" max="0.85" step="0.01" value="0.72" />
+
+          <div class="row"><label for="promoY">Card Y</label><span class="v" id="promoY-v"></span></div>
+          <input id="promoY" type="range" min="0.18" max="0.82" step="0.01" value="0.52" />
+        </div>
+      </section>
+
       <div class="actions">
         <button id="copy-glsl" type="button">Copy GLSL</button>
         <button id="download-glsl" type="button">Download GLSL</button>
@@ -259,6 +363,7 @@
         </div>
       </div>
       <input id="import-file" type="file" accept=".zip,.json,.txt,application/zip,application/json,text/plain" style="display:none;" />
+      <input id="promo-image-input" type="file" accept="image/*" style="display:none;" />
       <div class="status" id="status"></div>
     </aside>
 
@@ -302,6 +407,15 @@
       uniform vec3 uColor3;
       uniform vec3 uBase;
       uniform vec3 uAccent;
+      uniform float uPromoMode;
+      uniform float uPromoReveal;
+      uniform float uPromoWarp;
+      uniform float uPromoFeather;
+      uniform float uPromoScale;
+      uniform float uPromoGlow;
+      uniform float uPromoX;
+      uniform float uPromoY;
+      uniform sampler2D uPromoTexture;
 
       float n21 (vec2 p)
       {
@@ -428,6 +542,34 @@
           return l1 + l2 + l3 + (uBase * uAmbient);
       }
 
+      vec4 samplePromo(vec2 uv, vec2 flow, float fieldStrength)
+      {
+          if (uPromoMode < 0.5) return vec4(0.0);
+
+          vec2 promoPos = vec2(uPromoX, uPromoY);
+          vec2 aspectUv = (uv - promoPos) * vec2(RATIO, 1.0);
+          vec2 promoUv = aspectUv / max(0.001, uPromoScale) + 0.5;
+          if (promoUv.x < 0.0 || promoUv.x > 1.0 || promoUv.y < 0.0 || promoUv.y > 1.0) return vec4(0.0);
+
+          vec2 warpNoise = vec2(
+              n21(promoUv * 12.7 + iTime * 0.11),
+              n21(promoUv.yx * 10.3 - iTime * 0.09)
+          ) - 0.5;
+          vec2 warpedUv = clamp(promoUv + flow * (0.02 + uPromoWarp * 0.09) + warpNoise * (0.015 + uPromoWarp * 0.02), 0.0, 1.0);
+          vec4 promo = texture2D(uPromoTexture, warpedUv);
+          if (promo.a < 0.001) return vec4(0.0);
+
+          float cardCenter = 1.0 - smoothstep(0.05, 0.78, length(promoUv - 0.5) * 1.45);
+          float revealField = cardCenter * 0.34 + fieldStrength * 0.46 + n21(promoUv * 18.0 + iTime * 0.05) * 0.2;
+          float revealThreshold = 1.18 - uPromoReveal * 1.3;
+          float feather = max(0.01, uPromoFeather);
+          float emergence = smoothstep(revealThreshold - feather, revealThreshold + feather, revealField);
+          float edgeBand = smoothstep(0.08, 0.85, emergence) * (1.0 - smoothstep(0.88, 1.0, emergence));
+          float alpha = promo.a * emergence;
+          vec3 glow = uAccent * edgeBand * uPromoGlow * 0.36;
+          return vec4(promo.rgb + glow, alpha);
+      }
+
       void mainImage( out vec4 fragColor, in vec2 fragCoord )
       {
           vec2 uv = (fragCoord / iResolution.xy - .5) * vec2(RATIO, 1.) / max(0.001, uZoom) + .5;
@@ -455,6 +597,12 @@
           col = pow(max(col, vec3(0.0)), vec3(1.0 / max(0.001, uGamma)));
           col = applyFx(col, uv);
 
+          float flowStrength = clamp(acc_frc / max(1.0, uPoints), 0.0, 1.0);
+          float swirlStrength = clamp(length(acc_rot) * 3.5, 0.0, 1.0);
+          vec2 flow = acc_rot * 0.3;
+          vec4 promo = samplePromo(uv, flow, clamp(flowStrength * 0.65 + swirlStrength * 0.35, 0.0, 1.0));
+          col = mix(col, promo.rgb, promo.a);
+
           fragColor = vec4(col,1.0);
       }
 
@@ -465,6 +613,7 @@
 
     <script>
       const defaults = {
+        mode: 'shader',
         points: 6,
         force: 2,
         rotation: 4,
@@ -498,6 +647,17 @@
         c3: '#0000ff',
         bg: '#ffffff',
         accent: '#ff49a8',
+        promoBadge: 'PROZ LAB',
+        promoHeadline: 'The next shader drop condenses out of the noise.',
+        promoBody: 'Square social card, branded image, and type locked inside the same fluid field.',
+        promoCta: 'See the reveal',
+        promoReveal: 0.62,
+        promoWarp: 0.34,
+        promoFeather: 0.16,
+        promoScale: 0.38,
+        promoGlow: 0.46,
+        promoX: 0.72,
+        promoY: 0.52,
       };
 
       const state = { ...defaults };
@@ -505,16 +665,37 @@
       const UNDO_LIMIT = 120;
       const undoStack = [];
       const undoSnapshots = new Map();
-      const sliderIds = [
+      const shaderSliderIds = [
         'points','force','rotation','swirlFreq','speed','zoom','drift','strength','ambient','offset','radius',
         'normalScale','specLow','specHigh','cycleSpeed','cycleAmount','gain','gamma','accentMix',
         'hueShift','huePulse','saturation','contrast','brightness','posterize','posterizeMix','grain','vignette'
       ];
+      const promoSliderIds = ['promoReveal', 'promoWarp', 'promoFeather', 'promoScale', 'promoGlow', 'promoX', 'promoY'];
+      const sliderIds = [...shaderSliderIds, ...promoSliderIds];
       const colorIds = ['c1', 'c2', 'c3', 'bg', 'accent'];
+      const textIds = ['promoBadge', 'promoHeadline', 'promoBody', 'promoCta'];
       const status = document.getElementById('status');
       const undoButton = document.getElementById('undo');
       const importFileInput = document.getElementById('import-file');
       const importTextEl = document.getElementById('import-text');
+      const promoControls = document.getElementById('promo-controls');
+      const promoImageInput = document.getElementById('promo-image-input');
+      const promoImageMeta = document.getElementById('promo-image-meta');
+      const modeButtons = Array.from(document.querySelectorAll('[data-mode]'));
+      const promoTextureCanvas = document.createElement('canvas');
+      promoTextureCanvas.width = 1024;
+      promoTextureCanvas.height = 1024;
+      const promoTextureContext = promoTextureCanvas.getContext('2d');
+      const promoImageState = {
+        dataUrl: '',
+        fileName: '',
+        image: null,
+      };
+      const promoTextureState = {
+        gl: null,
+        texture: null,
+        dirty: true,
+      };
 
       function normalizeHex(input) {
         const trimmed = input.trim();
@@ -551,6 +732,280 @@
           return Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
         };
         return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+      }
+
+      function hexToRgb255(hex) {
+        const h = hex.replace('#', '');
+        const value = parseInt(h, 16);
+        return {
+          r: (value >> 16) & 255,
+          g: (value >> 8) & 255,
+          b: value & 255,
+        };
+      }
+
+      function hexToRgba(hex, alpha) {
+        const { r, g, b } = hexToRgb255(hex);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+
+      function roundRectPath(ctx, x, y, width, height, radius) {
+        const capped = Math.max(0, Math.min(radius, Math.min(width, height) / 2));
+        ctx.beginPath();
+        ctx.moveTo(x + capped, y);
+        ctx.arcTo(x + width, y, x + width, y + height, capped);
+        ctx.arcTo(x + width, y + height, x, y + height, capped);
+        ctx.arcTo(x, y + height, x, y, capped);
+        ctx.arcTo(x, y, x + width, y, capped);
+        ctx.closePath();
+      }
+
+      function fillRoundRect(ctx, x, y, width, height, radius, fillStyle) {
+        roundRectPath(ctx, x, y, width, height, radius);
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
+      }
+
+      function strokeRoundRect(ctx, x, y, width, height, radius, strokeStyle, lineWidth) {
+        roundRectPath(ctx, x, y, width, height, radius);
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+
+      function drawCoverImage(ctx, image, x, y, width, height) {
+        const sourceWidth = image.naturalWidth || image.width;
+        const sourceHeight = image.naturalHeight || image.height;
+        if (!sourceWidth || !sourceHeight) return;
+
+        const scale = Math.max(width / sourceWidth, height / sourceHeight);
+        const drawWidth = sourceWidth * scale;
+        const drawHeight = sourceHeight * scale;
+        const drawX = x + (width - drawWidth) / 2;
+        const drawY = y + (height - drawHeight) / 2;
+        ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      }
+
+      function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+        const words = text.trim().split(/\s+/).filter(Boolean);
+        if (!words.length) return y;
+
+        const lines = [];
+        let currentLine = words[0];
+
+        for (let i = 1; i < words.length; i++) {
+          const candidate = `${currentLine} ${words[i]}`;
+          if (ctx.measureText(candidate).width <= maxWidth) {
+            currentLine = candidate;
+            continue;
+          }
+          lines.push(currentLine);
+          currentLine = words[i];
+          if (lines.length === maxLines - 1) break;
+        }
+
+        if (lines.length < maxLines) lines.push(currentLine);
+        const remainingWords = words.slice(lines.join(' ').split(/\s+/).filter(Boolean).length);
+        if (remainingWords.length && lines.length) {
+          const lastLine = `${lines[lines.length - 1]} ${remainingWords.join(' ')}`.trim();
+          let clipped = lastLine;
+          while (ctx.measureText(`${clipped}…`).width > maxWidth && clipped.length > 1) {
+            clipped = clipped.slice(0, -1);
+          }
+          lines[lines.length - 1] = `${clipped}…`;
+        }
+
+        lines.forEach((line, index) => {
+          ctx.fillText(line, x, y + index * lineHeight);
+        });
+
+        return y + lines.length * lineHeight;
+      }
+
+      function updatePromoImageMeta() {
+        promoImageMeta.textContent = promoImageState.fileName || 'No image loaded';
+      }
+
+      function drawPromoTexture() {
+        if (!promoTextureContext) return;
+
+        const ctx = promoTextureContext;
+        const canvas = promoTextureCanvas;
+        const size = canvas.width;
+        const outerMargin = 72;
+        const cardX = outerMargin;
+        const cardY = outerMargin;
+        const cardSize = size - outerMargin * 2;
+        const radius = 62;
+        const cardPadding = 72;
+        const imageHeight = promoImageState.image ? cardSize * 0.52 : cardSize * 0.34;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.shadowColor = hexToRgba(state.accent, 0.26);
+        ctx.shadowBlur = 80;
+        ctx.shadowOffsetY = 26;
+        fillRoundRect(ctx, cardX, cardY + 16, cardSize, cardSize - 8, radius, 'rgba(2, 4, 10, 0.54)');
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+
+        const shellGradient = ctx.createLinearGradient(cardX, cardY, cardX + cardSize, cardY + cardSize);
+        shellGradient.addColorStop(0, hexToRgba(state.bg, 0.95));
+        shellGradient.addColorStop(0.45, 'rgba(12, 15, 27, 0.98)');
+        shellGradient.addColorStop(1, hexToRgba(state.c1, 0.74));
+        fillRoundRect(ctx, cardX, cardY, cardSize, cardSize, radius, shellGradient);
+
+        ctx.save();
+        roundRectPath(ctx, cardX, cardY, cardSize, cardSize, radius);
+        ctx.clip();
+
+        const imageGradient = ctx.createLinearGradient(cardX, cardY, cardX + cardSize, cardY + imageHeight);
+        imageGradient.addColorStop(0, hexToRgba(state.c2, 0.92));
+        imageGradient.addColorStop(1, hexToRgba(state.c3, 0.68));
+        ctx.fillStyle = imageGradient;
+        ctx.fillRect(cardX, cardY, cardSize, imageHeight);
+
+        if (promoImageState.image) {
+          drawCoverImage(ctx, promoImageState.image, cardX, cardY, cardSize, imageHeight);
+        } else {
+          const orbGradient = ctx.createRadialGradient(
+            cardX + cardSize * 0.3,
+            cardY + imageHeight * 0.3,
+            0,
+            cardX + cardSize * 0.3,
+            cardY + imageHeight * 0.3,
+            cardSize * 0.42
+          );
+          orbGradient.addColorStop(0, hexToRgba(state.accent, 0.88));
+          orbGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          ctx.fillStyle = orbGradient;
+          ctx.fillRect(cardX, cardY, cardSize, imageHeight);
+
+          ctx.strokeStyle = hexToRgba(state.accent, 0.34);
+          ctx.lineWidth = 4;
+          for (let i = 0; i < 6; i++) {
+            const inset = 40 + i * 38;
+            roundRectPath(ctx, cardX + inset, cardY + inset * 0.58, cardSize - inset * 2, imageHeight - inset * 0.8, 34);
+            ctx.stroke();
+          }
+        }
+
+        const fadeGradient = ctx.createLinearGradient(cardX, cardY + imageHeight * 0.52, cardX, cardY + imageHeight);
+        fadeGradient.addColorStop(0, 'rgba(6, 8, 14, 0)');
+        fadeGradient.addColorStop(1, 'rgba(6, 8, 14, 0.84)');
+        ctx.fillStyle = fadeGradient;
+        ctx.fillRect(cardX, cardY, cardSize, imageHeight);
+
+        ctx.fillStyle = 'rgba(5, 7, 13, 0.92)';
+        ctx.fillRect(cardX, cardY + imageHeight, cardSize, cardSize - imageHeight);
+
+        const bandHeight = 18;
+        const bandGradient = ctx.createLinearGradient(cardX, cardY, cardX + cardSize, cardY);
+        bandGradient.addColorStop(0, hexToRgba(state.accent, 0.98));
+        bandGradient.addColorStop(1, hexToRgba(state.c2, 0.92));
+        ctx.fillStyle = bandGradient;
+        ctx.fillRect(cardX, cardY, cardSize, bandHeight);
+
+        const copyX = cardX + cardPadding;
+        const copyWidth = cardSize - cardPadding * 2;
+        let cursorY = cardY + imageHeight + 68;
+
+        ctx.font = '600 24px "Avenir Next", "Segoe UI", sans-serif';
+        ctx.fillStyle = hexToRgba(state.accent, 0.96);
+        ctx.fillText((state.promoBadge || '').toUpperCase().slice(0, 32), copyX, cursorY);
+        cursorY += 54;
+
+        ctx.font = '700 60px "Avenir Next", "Segoe UI", sans-serif';
+        ctx.fillStyle = 'rgba(244, 247, 255, 0.98)';
+        cursorY = drawWrappedText(ctx, state.promoHeadline || '', copyX, cursorY, copyWidth, 68, 3);
+        cursorY += 20;
+
+        ctx.font = '400 28px "Avenir Next", "Segoe UI", sans-serif';
+        ctx.fillStyle = 'rgba(196, 208, 234, 0.86)';
+        cursorY = drawWrappedText(ctx, state.promoBody || '', copyX, cursorY, copyWidth, 40, 3);
+        cursorY += 34;
+
+        const ctaWidth = Math.min(copyWidth, Math.max(240, ctx.measureText(state.promoCta || '').width + 72));
+        const ctaHeight = 76;
+        const ctaY = Math.min(cardY + cardSize - cardPadding - ctaHeight, cursorY);
+        const ctaGradient = ctx.createLinearGradient(copyX, ctaY, copyX + ctaWidth, ctaY + ctaHeight);
+        ctaGradient.addColorStop(0, hexToRgba(state.accent, 0.96));
+        ctaGradient.addColorStop(1, hexToRgba(state.c1, 0.96));
+        fillRoundRect(ctx, copyX, ctaY, ctaWidth, ctaHeight, 28, ctaGradient);
+
+        ctx.font = '700 24px "Avenir Next", "Segoe UI", sans-serif';
+        ctx.fillStyle = 'rgba(10, 10, 16, 0.98)';
+        ctx.fillText(state.promoCta || '', copyX + 28, ctaY + 46);
+        ctx.restore();
+
+        strokeRoundRect(ctx, cardX + 2, cardY + 2, cardSize - 4, cardSize - 4, radius - 2, 'rgba(255, 255, 255, 0.18)', 2);
+        promoTextureState.dirty = true;
+      }
+
+      function ensurePromoTexture(gl) {
+        if (promoTextureState.gl !== gl || !promoTextureState.texture) {
+          promoTextureState.gl = gl;
+          promoTextureState.texture = gl.createTexture();
+          promoTextureState.dirty = true;
+          gl.bindTexture(gl.TEXTURE_2D, promoTextureState.texture);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        }
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, promoTextureState.texture);
+
+        if (!promoTextureState.dirty) return;
+
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, promoTextureCanvas);
+        promoTextureState.dirty = false;
+      }
+
+      function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error || new Error('File read failed'));
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function loadPromoImageFromDataUrl(dataUrl, fileName = '') {
+        return new Promise((resolve, reject) => {
+          if (!dataUrl) {
+            promoImageState.dataUrl = '';
+            promoImageState.fileName = '';
+            promoImageState.image = null;
+            updatePromoImageMeta();
+            drawPromoTexture();
+            resolve();
+            return;
+          }
+
+          const image = new Image();
+          image.onload = () => {
+            promoImageState.dataUrl = dataUrl;
+            promoImageState.fileName = fileName || 'Promo image loaded';
+            promoImageState.image = image;
+            updatePromoImageMeta();
+            drawPromoTexture();
+            resolve();
+          };
+          image.onerror = () => reject(new Error('Could not decode promo image'));
+          image.src = dataUrl;
+        });
+      }
+
+      function clearPromoImage() {
+        promoImageState.dataUrl = '';
+        promoImageState.fileName = '';
+        promoImageState.image = null;
+        updatePromoImageMeta();
+        drawPromoTexture();
       }
 
       function rand(min, max) {
@@ -659,7 +1114,7 @@
           vignette: [0.0, 0.6],
         };
 
-        sliderIds.forEach((id) => {
+        shaderSliderIds.forEach((id) => {
           const el = document.getElementById(id);
           const min = parseFloat(el.min);
           const max = parseFloat(el.max);
@@ -755,6 +1210,7 @@ Files:
 - shader.glsl: fully baked shader source
 - integration.json: runtime/layering/mobile integration settings
 - embed-snippet.js: drop-in init snippet (uses shader-web-background.min.js)
+- promo-image.txt: optional data URL for the uploaded promo image
 
 How to recreate:
 1) Open this Shader Lab and click "Import Repro Pack" to load preset.json from the ZIP.
@@ -910,6 +1366,10 @@ How to recreate:
         if (!raw || typeof raw !== 'object') throw new Error('Imported data is not a preset object');
         const normalized = { ...defaults };
 
+        if (raw.mode === 'promo' || raw.mode === 'shader') {
+          normalized.mode = raw.mode;
+        }
+
         sliderIds.forEach((id) => {
           if (raw[id] === undefined || raw[id] === null || raw[id] === '') return;
           const el = document.getElementById(id);
@@ -926,6 +1386,11 @@ How to recreate:
           if (typeof maybe !== 'string') return;
           const hex = normalizeHex(maybe);
           if (hex) normalized[id] = hex;
+        });
+
+        textIds.forEach((id) => {
+          if (typeof raw[id] !== 'string') return;
+          normalized[id] = raw[id];
         });
 
         return normalized;
@@ -1007,6 +1472,19 @@ How to recreate:
           hexEl.value = state[id];
           hexEl.classList.remove('invalid');
         });
+
+        textIds.forEach((id) => {
+          const el = document.getElementById(id);
+          if (el.value !== state[id]) el.value = state[id];
+        });
+
+        promoControls.classList.toggle('hidden', state.mode !== 'promo');
+        modeButtons.forEach((button) => {
+          button.classList.toggle('active', button.dataset.mode === state.mode);
+        });
+
+        updatePromoImageMeta();
+        drawPromoTexture();
       }
 
       sliderIds.forEach((id) => {
@@ -1023,6 +1501,17 @@ How to recreate:
         el.addEventListener('blur', () => commitUndoCapture(`slider-${id}`));
       });
 
+      textIds.forEach((id) => {
+        const el = document.getElementById(id);
+        el.addEventListener('focus', () => beginUndoCapture(`text-${id}`));
+        el.addEventListener('input', () => {
+          state[id] = el.value;
+          drawPromoTexture();
+        });
+        el.addEventListener('change', () => commitUndoCapture(`text-${id}`));
+        el.addEventListener('blur', () => commitUndoCapture(`text-${id}`));
+      });
+
       colorIds.forEach((id) => {
         const picker = document.getElementById(id);
         const hexEl = document.getElementById(`${id}hex`);
@@ -1032,6 +1521,7 @@ How to recreate:
           state[id] = picker.value;
           hexEl.value = picker.value;
           hexEl.classList.remove('invalid');
+          drawPromoTexture();
         });
         picker.addEventListener('change', () => commitUndoCapture(`color-${id}`));
         picker.addEventListener('blur', () => commitUndoCapture(`color-${id}`));
@@ -1048,8 +1538,20 @@ How to recreate:
           state[id] = hx;
           picker.value = hx;
           hexEl.value = hx;
+          drawPromoTexture();
         });
         hexEl.addEventListener('blur', () => commitUndoCapture(`hex-${id}`));
+      });
+
+      modeButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const nextMode = button.dataset.mode === 'promo' ? 'promo' : 'shader';
+          if (state.mode === nextMode) return;
+          pushUndoSnapshot(cloneState());
+          state.mode = nextMode;
+          syncUI();
+          setStatus(nextMode === 'promo' ? 'Promo mode enabled' : 'Shader mode enabled');
+        });
       });
 
       document.getElementById('apply-palette').addEventListener('click', () => {
@@ -1351,6 +1853,7 @@ void main() {
         const raw = importTextEl.value;
         try {
           const parsed = parseImportedText(raw);
+          clearPromoImage();
           applyImportedPreset(parsed, 'pasted data');
         } catch {
           setStatus('Import failed: use preset JSON, share link, or share code');
@@ -1375,14 +1878,46 @@ void main() {
             if (!presetText) throw new Error('No preset JSON in ZIP');
             const parsed = JSON.parse(presetText);
             applyImportedPreset(parsed, file.name);
+            if (files['promo-image.txt'] || files['./promo-image.txt']) {
+              const promoImageData = files['promo-image.txt'] || files['./promo-image.txt'];
+              await loadPromoImageFromDataUrl(promoImageData, parsed.promoImage?.fileName || 'Imported promo image');
+            } else {
+              clearPromoImage();
+            }
           } else {
             const parsed = parseImportedText(await file.text());
+            clearPromoImage();
             applyImportedPreset(parsed, file.name);
           }
         } catch {
           setStatus('Import failed: unsupported or corrupted file');
         } finally {
           importFileInput.value = '';
+        }
+      });
+
+      document.getElementById('upload-promo-image').addEventListener('click', () => {
+        promoImageInput.click();
+      });
+
+      document.getElementById('clear-promo-image').addEventListener('click', () => {
+        clearPromoImage();
+        setStatus('Promo image cleared');
+      });
+
+      promoImageInput.addEventListener('change', async () => {
+        const file = promoImageInput.files && promoImageInput.files[0];
+        if (!file) return;
+        try {
+          const dataUrl = await readFileAsDataUrl(file);
+          await loadPromoImageFromDataUrl(dataUrl, file.name);
+          if (state.mode !== 'promo') state.mode = 'promo';
+          syncUI();
+          setStatus('Promo image loaded');
+        } catch {
+          setStatus('Could not read promo image');
+        } finally {
+          promoImageInput.value = '';
         }
       });
 
@@ -1396,6 +1931,11 @@ void main() {
             generatedAt,
             state: { ...state },
           };
+          if (promoImageState.dataUrl) {
+            preset.promoImage = {
+              fileName: promoImageState.fileName || 'promo-image',
+            };
+          }
 
           const files = [
             { name: 'preset.json', content: JSON.stringify(preset, null, 2) },
@@ -1404,6 +1944,9 @@ void main() {
             { name: 'embed-snippet.js', content: buildEmbedSnippet(glsl, integration) },
             { name: 'README.txt', content: buildPackReadme(integration) },
           ];
+          if (promoImageState.dataUrl) {
+            files.push({ name: 'promo-image.txt', content: promoImageState.dataUrl });
+          }
 
           const zipBlob = buildZip(files);
           const stamp = generatedAt.replace(/[:.]/g, '-');
@@ -1452,6 +1995,18 @@ void main() {
               uPosterizeMix: (gl, loc) => gl.uniform1f(loc, state.posterizeMix),
               uGrain: (gl, loc) => gl.uniform1f(loc, state.grain),
               uVignette: (gl, loc) => gl.uniform1f(loc, state.vignette),
+              uPromoMode: (gl, loc) => gl.uniform1f(loc, state.mode === 'promo' ? 1 : 0),
+              uPromoReveal: (gl, loc) => gl.uniform1f(loc, state.promoReveal),
+              uPromoWarp: (gl, loc) => gl.uniform1f(loc, state.promoWarp),
+              uPromoFeather: (gl, loc) => gl.uniform1f(loc, state.promoFeather),
+              uPromoScale: (gl, loc) => gl.uniform1f(loc, state.promoScale),
+              uPromoGlow: (gl, loc) => gl.uniform1f(loc, state.promoGlow),
+              uPromoX: (gl, loc) => gl.uniform1f(loc, state.promoX),
+              uPromoY: (gl, loc) => gl.uniform1f(loc, state.promoY),
+              uPromoTexture: (gl, loc) => {
+                ensurePromoTexture(gl);
+                gl.uniform1i(loc, 0);
+              },
               uColor1: (gl, loc) => {
                 const [r, g, b] = hexToRgb01(state.c1);
                 gl.uniform3f(loc, r, g, b);
